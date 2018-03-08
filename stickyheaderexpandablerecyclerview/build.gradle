@@ -39,7 +39,7 @@ bintray {
     user = properties.getProperty("bintray.user")
     key = properties.getProperty("bintray.apikey")
     pkg {
-        repo = NAME//自己创建的仓库名字
+        repo = BINTRAY_REPO_NAME//自己创建的仓库名字
         name = NAME//上传到JCenter的名字,最终引用的名字
         websiteUrl = siteUrl
         vcsUrl = gitUrl
