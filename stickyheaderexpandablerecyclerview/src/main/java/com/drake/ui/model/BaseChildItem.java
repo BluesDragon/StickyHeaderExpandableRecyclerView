@@ -1,6 +1,6 @@
 package com.drake.ui.model;
 
-public abstract class ChildListItem implements ChildItem {
+public abstract class BaseChildItem implements IChildItem {
 
     protected int mGroupPosition;
     protected int mChildPosition;

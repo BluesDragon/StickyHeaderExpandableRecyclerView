@@ -12,11 +12,11 @@ import android.view.ViewGroup;
 import android.widget.FrameLayout;
 
 import com.drake.ui.layoutmanager.StableLinearLayoutManager;
-import com.drake.ui.model.ChildListItem;
-import com.drake.ui.model.GroupListItem;
+import com.drake.ui.model.BaseChildItem;
+import com.drake.ui.model.BaseGroupItem;
 import com.drake.ui.model.IItem;
-import com.drake.ui.viewholder.ChildViewHolder;
-import com.drake.ui.viewholder.GroupViewHolder;
+import com.drake.ui.viewholder.BaseChildViewHolder;
+import com.drake.ui.viewholder.BaseGroupViewHolder;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -26,12 +26,12 @@ import java.util.Map;
 /**
  * 可打开/关闭组的、粘性header的RecyclerView
  */
-public class StickyHeaderExpandableRecyclerView extends FrameLayout {
+public class StickyHeaderExpandableRecyclerView<C extends BaseChildItem, G extends BaseGroupItem<C>> extends FrameLayout {
 
-    public static abstract class Callback {
+    public static abstract class Callback<G extends BaseGroupItem> {
         public abstract RecyclerView.ViewHolder getHolder(Context context, ViewGroup parent, int viewType);
 
-        public abstract void buildList(List<GroupListItem> list);
+        public abstract void buildList(List<G> list);
 
         public void onDataSetChanged() {
         }
@@ -46,7 +46,7 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
     private Callback mCallback;
     private RecyclerView.ViewHolder mHeaderHolder;
 
-    private final List<GroupListItem> mGroupList = new ArrayList<>();
+    private final List<G> mGroupList = new ArrayList<>();
     private int mCurrentGroupPosition = -1;// 记录Header的position, 避免重复刷新
     private int mCurrentTranslationY;// 记录Header的位移大小, 避免重复刷新
     private boolean useStickyHeader = USE_HEADER;// 是否固定组
@@ -142,17 +142,17 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
 
             RecyclerView.ViewHolder firstVisibleHolder = mCommonRecyclerView.getChildViewHolder(firstVisibleView);
             int currentGroupPosition = 0;
-            if (firstVisibleHolder instanceof GroupViewHolder) {
+            if (firstVisibleHolder instanceof BaseGroupViewHolder) {
                 currentGroupPosition = currentFirstPosition;
             } else {
                 List<IItem> list = mCommonRecyclerView.getItemList();
                 if (currentFirstPosition < list.size()) {
                     IItem iItem = list.get(currentFirstPosition);
-                    if (iItem != null && iItem instanceof ChildListItem) {
-                        ChildListItem childListItem = (ChildListItem) iItem;
+                    if (iItem != null && iItem instanceof BaseChildItem) {
+                        BaseChildItem childListItem = (BaseChildItem) iItem;
                         synchronized (mGroupList) {
                             if (childListItem.getGroupPosition() < mGroupList.size()) {
-                                GroupListItem groupListItem = mGroupList.get(childListItem.getGroupPosition());
+                                BaseGroupItem groupListItem = mGroupList.get(childListItem.getGroupPosition());
                                 currentGroupPosition = list.indexOf(groupListItem);
                             }
                         }
@@ -172,7 +172,7 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
                     secondVisibleHolder = mCommonRecyclerView.getChildViewHolder(secondVisibleView);
                 }
                 int translationY;
-                if (secondVisibleHolder != null && secondVisibleHolder instanceof GroupViewHolder) {
+                if (secondVisibleHolder != null && secondVisibleHolder instanceof BaseGroupViewHolder) {
                     int top = secondVisibleView.getTop();
                     int height = secondVisibleView.getHeight();
                     if (top < height) {
@@ -218,16 +218,16 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
         public boolean onBindViewHolder(RecyclerView.ViewHolder holder, IItem item, int position) {
             if (holder != null) {
                 if (item != null) {
-                    if (item instanceof GroupListItem) {
-                        GroupListItem groupItem = (GroupListItem) item;
-                        if (holder instanceof GroupViewHolder) {
-                            GroupViewHolder groupViewHolder = (GroupViewHolder) holder;
+                    if (item instanceof BaseGroupItem) {
+                        BaseGroupItem groupItem = (BaseGroupItem) item;
+                        if (holder instanceof BaseGroupViewHolder) {
+                            BaseGroupViewHolder groupViewHolder = (BaseGroupViewHolder) holder;
                             groupViewHolder.build(groupItem, groupItem.getGroupPosition());
                         }
-                    } else if (item instanceof ChildListItem) {
-                        ChildListItem childItem = (ChildListItem) item;
-                        if (holder instanceof ChildViewHolder) {
-                            ChildViewHolder childViewHolder = (ChildViewHolder) holder;
+                    } else if (item instanceof BaseChildItem) {
+                        BaseChildItem childItem = (BaseChildItem) item;
+                        if (holder instanceof BaseChildViewHolder) {
+                            BaseChildViewHolder childViewHolder = (BaseChildViewHolder) holder;
                             synchronized (mGroupList) {
                                 if (mGroupList.size() > childItem.getGroupPosition())
                                     childViewHolder.build(mGroupList.get(childItem.getGroupPosition()), childItem, childItem.getGroupPosition(), childItem.getChildPosition());
@@ -256,15 +256,15 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
             List<IItem> tempList = new ArrayList<>();
             synchronized (mGroupList) {
                 for (int i = 0; i < mGroupList.size(); i++) {
-                    GroupListItem groupItem = mGroupList.get(i);
+                    BaseGroupItem<C> groupItem = mGroupList.get(i);
                     if (groupItem != null) {
                         groupItem.setGroupPosition(i);
                         tempList.add(groupItem);
-                        List<ChildListItem> childrenList = groupItem.getChildrenList();
+                        List<C> childrenList = groupItem.getChildrenList();
                         if (childrenList != null) {
                             if (groupItem.isExpand()) {
                                 for (int j = 0; j < childrenList.size(); j++) {
-                                    ChildListItem childItem = childrenList.get(j);
+                                    BaseChildItem childItem = childrenList.get(j);
                                     if (childItem != null) {
                                         childItem.setGroupPosition(i);
                                         childItem.setChildPosition(j);
@@ -282,19 +282,23 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
 
         @Override
         public void onDataSetChanged() {
-            long delay = 0;
-            if (mHeaderHolder == null) {
-                // 延迟处理，避免与RecyclerView同时处理布局导致header显示不完全。
-                delay = 300;
-            }
-            if (mHandler != null) {
-                mHandler.sendEmptyMessageDelayed(MSG_UPDATE_HEADER, delay);
-            }
+            checkUpdateHeaderDelay();
             if (mCallback != null) {
                 mCallback.onDataSetChanged();
             }
         }
     };
+
+    private void checkUpdateHeaderDelay() {
+        long delay = 0;
+        if (mHeaderHolder == null) {
+            // 延迟处理，避免与RecyclerView同时处理布局导致header显示不完全。
+            delay = 300;
+        }
+        if (mHandler != null) {
+            mHandler.sendEmptyMessageDelayed(MSG_UPDATE_HEADER, delay);
+        }
+    }
 
     /**********************************************************************************************/
 
@@ -306,9 +310,15 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
     private boolean forceUpdateHeader;
 
     public void updateList() {
-        forceUpdateHeader = true;
         if (mCommonRecyclerView != null)
             mCommonRecyclerView.updateList();
+        checkUpdateHeaderDelay();
+    }
+
+    public void updateListAsync() {
+        forceUpdateHeader = true;
+        if (mCommonRecyclerView != null)
+            mCommonRecyclerView.updateListAsync();
     }
 
     public void setItemList(List list) {
@@ -354,11 +364,11 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
     public void removeItemByAdapterPosition(int position, boolean refreshUI) {
         if (mCommonRecyclerView != null) {
             IItem item = mCommonRecyclerView.getItem(position);
-            if (item instanceof GroupListItem) {
-                GroupListItem groupListItem = (GroupListItem) item;
+            if (item instanceof BaseGroupItem) {
+                BaseGroupItem groupListItem = (BaseGroupItem) item;
                 removeGroupItem(groupListItem, refreshUI);
-            } else if (item instanceof ChildListItem) {
-                ChildListItem childListItem = (ChildListItem) item;
+            } else if (item instanceof BaseChildItem) {
+                BaseChildItem childListItem = (BaseChildItem) item;
                 removeChildItem(childListItem, refreshUI);
             }
         }
@@ -367,7 +377,7 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
     /**
      * 删除一组数据
      */
-    public void removeGroupItem(GroupListItem groupListItem) {
+    public void removeGroupItem(BaseGroupItem groupListItem) {
         removeGroupItem(groupListItem, true);
     }
 
@@ -390,7 +400,7 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
      *
      * @param refreshUI 是否刷新ui
      */
-    public void removeGroupItem(GroupListItem groupListItem, boolean refreshUI) {
+    public void removeGroupItem(BaseGroupItem groupListItem, boolean refreshUI) {
         if (groupListItem == null)
             return;
         synchronized (mGroupList) {
@@ -410,7 +420,7 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
     /**
      * 删除一条数据
      */
-    public void removeChildItem(ChildListItem childListItem) {
+    public void removeChildItem(BaseChildItem childListItem) {
         removeChildItem(childListItem, true);
     }
 
@@ -419,10 +429,10 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
      *
      * @param refreshUI 是否刷新ui
      */
-    public void removeChildItem(ChildListItem childListItem, boolean refreshUI) {
+    public void removeChildItem(BaseChildItem childListItem, boolean refreshUI) {
         if (childListItem == null)
             return;
-        GroupListItem groupListItem = getGroupItem(childListItem.getGroupPosition());
+        BaseGroupItem groupListItem = getGroupItem(childListItem.getGroupPosition());
         List childrenList = groupListItem.getChildrenList();
         if (childrenList != null) {
             if (childrenList.contains(childListItem)) {
@@ -445,7 +455,7 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
     }
 
     public void removeChildItem(int groupPosition, int childPosition, boolean refreshUI) {
-        ChildListItem childItem = getChildItem(groupPosition, childPosition);
+        BaseChildItem childItem = getChildItem(groupPosition, childPosition);
         if (childItem != null) {
             removeChildItem(childItem, refreshUI);
         }
@@ -470,7 +480,7 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
         int size = 0;
         synchronized (mGroupList) {
             if (mGroupList != null) {
-                for (GroupListItem groupListItem : mGroupList) {
+                for (BaseGroupItem groupListItem : mGroupList) {
                     try {
                         if (groupListItem != null) {
                             size += groupListItem.getChildCount();
@@ -494,7 +504,7 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
         return mCommonRecyclerView;
     }
 
-    public GroupListItem getGroupItem(int groupPosition) {
+    public G getGroupItem(int groupPosition) {
         synchronized (mGroupList) {
             if (groupPosition >= 0 && groupPosition < mGroupList.size())
                 return mGroupList.get(groupPosition);
@@ -502,10 +512,10 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
         return null;
     }
 
-    public ChildListItem getChildItem(int groupPosition, int childPosition) {
-        GroupListItem groupItem = getGroupItem(groupPosition);
+    public C getChildItem(int groupPosition, int childPosition) {
+        BaseGroupItem<C> groupItem = getGroupItem(groupPosition);
         if (groupItem != null) {
-            List<ChildListItem> childrenList = groupItem.getChildrenList();
+            List<C> childrenList = groupItem.getChildrenList();
             if (childrenList != null && childPosition >= 0 && childPosition < childrenList.size()) {
                 return childrenList.get(childPosition);
             }
@@ -513,11 +523,11 @@ public class StickyHeaderExpandableRecyclerView extends FrameLayout {
         return null;
     }
 
-    public ChildListItem getChildItemByAdapterPosition(int position) {
+    public IItem getChildItemByAdapterPosition(int position) {
         if (mCommonRecyclerView != null) {
             IItem item = mCommonRecyclerView.getItem(position);
-            if (item != null && item instanceof ChildListItem) {
-                return (ChildListItem) item;
+            if (item != null && item instanceof BaseChildItem) {
+                return item;
             }
         }
         return null;

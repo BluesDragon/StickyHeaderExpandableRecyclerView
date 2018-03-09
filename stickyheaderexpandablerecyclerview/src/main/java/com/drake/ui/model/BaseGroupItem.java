@@ -2,9 +2,20 @@ package com.drake.ui.model;
 
 import java.util.List;
 
-public abstract class GroupListItem<C extends ChildListItem> implements GroupItem {
+public abstract class BaseGroupItem<C extends BaseChildItem> implements IGroupItem {
 
     protected int mGroupPosition;
+    protected boolean isExpand = true;
+
+    @Override
+    public boolean isExpand() {
+        return isExpand;
+    }
+
+    @Override
+    public void setExpand(boolean expand) {
+        this.isExpand = expand;
+    }
 
     public int getGroupPosition() {
         return mGroupPosition;
@@ -20,4 +31,6 @@ public abstract class GroupListItem<C extends ChildListItem> implements GroupIte
             return childrenList.size();
         return 0;
     }
+
+    public abstract List<C> getChildrenList();
 }

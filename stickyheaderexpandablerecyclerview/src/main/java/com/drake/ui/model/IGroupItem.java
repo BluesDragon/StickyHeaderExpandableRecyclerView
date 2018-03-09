@@ -2,11 +2,11 @@ package com.drake.ui.model;
 
 import java.util.List;
 
-public interface GroupItem<C extends ChildItem> extends IItem {
+public interface IGroupItem<C extends IChildItem> extends IItem {
 
     boolean isExpand();
 
-    void setExpand(boolean closed);
+    void setExpand(boolean expand);
 
     List<C> getChildrenList();
 
