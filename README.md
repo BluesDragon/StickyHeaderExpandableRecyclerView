@@ -3,6 +3,8 @@
 ## Maven:
     compile 'com.drake.ui:stickyheaderexpandablerecyclerview:1.0.1'
 
+### This library is based on [CommonRecyclerView](https://github.com/BluesDragon/CommonRecyclerView).
+
 ### Init StickyHeaderExpandbleRecyclerView
     StickyHeaderExpandableRecyclerView<MyChildItem, MyGroupItem> recyclerView = findViewById(R.id.id_stick_header_expandable_recyclerView);
     
@@ -150,6 +152,9 @@
     recyclerView.reloadData();
 
 ### Refresh List Async
+    recyclerView.updateListAsync();
+
+### Refresh List Sync (Same to notifyDataSetChange)
     recyclerView.updateList();
 
 ### Set your Item list
@@ -157,3 +162,5 @@
     // refresh
     recyclerView.updateList();
 
+### Get CommonRecyclerView
+    CommonRecyclerView getRecyclerView();
